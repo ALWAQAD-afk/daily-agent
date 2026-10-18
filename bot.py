@@ -5,7 +5,7 @@ from google import genai
 # معلوماتك المباشرة
 TELEGRAM_BOT_TOKEN = "8998558070:AAF_fYr2gym7JtX2TieGxnh4WeP1rIQ71ns"
 TELEGRAM_CHAT_ID = "7991076455"
-GEMINI_API_KEY = "8998558070:AAF_fYr2gym7JtX2TieGxnh4WeP1rIQ71ns"
+GEMINI_API_KEY = "AQ.Ab8RN6Lxn95U7zGNK-1lYDYmvjlofyyPj9ph0dW4yJjleY3KgA"
 
 def generate_smart_message():
     client = genai.Client(api_key=GEMINI_API_KEY)
