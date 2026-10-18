@@ -2,13 +2,13 @@ name: Smart Reminder Agent
 
 on:
   schedule:
-    # يعمل السكريبت آلياً عدة مرات في اليوم بأوقات متفرقة (توقيت UTC)
     - cron: '0 6,12,18 * * *'
-  workflow_dispatch: # يتيح لك تشغيله يدوياً متى شئت للاختبار
+  workflow_dispatch:
 
 jobs:
   run-reminder:
-    runs-on: ubuntu-lbot.py    steps:
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -28,4 +28,3 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python bot.py
-
