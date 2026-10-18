@@ -2,10 +2,10 @@ import os
 import requests
 from google import genai
 
-# ضع معلوماتك هنا مباشرة لحل مشكلة قراءة المتغيرات السحابية نهائياً
+# معلوماتك المباشرة
 TELEGRAM_BOT_TOKEN = "8998558070:AAF_fYr2gym7JtX2TieGxnh4WeP1rIQ71ns"
 TELEGRAM_CHAT_ID = "7991076455"
-GEMINI_API_KEY = "AQ.Ab8RN6K-mN5KAExbn5pl9sR6A4P2VTLKBq-brDtEY4L4_F1AUg"
+GEMINI_API_KEY = "8998558070:AAF_fYr2gym7JtX2TieGxnh4WeP1rIQ71ns"
 
 def generate_smart_message():
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -15,7 +15,7 @@ def generate_smart_message():
     اكتب له رسالة قصيرة، ذكية، تحفيزية، وغير روبوتية تسأله عن تقدمه وتفتتح الحوار بأسلوب لطيف.
     """
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",  # تم التحديث للنموذج المدعوم
         contents=prompt,
     )
     return response.text
