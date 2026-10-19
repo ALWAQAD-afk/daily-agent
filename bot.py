@@ -1,16 +1,20 @@
 import os
 import json
 import random
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
-from google import genai
+from openai import OpenAI
 
 # ====================== الإعدادات ======================
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+
+# تقدر تغير الموديل من هنا بسهولة
+MODEL = "google/gemini-2.0-flash-001"   # سريع ورخيص
+# MODEL = "deepseek/deepseek-chat"      # لو تبي DeepSeek
+# MODEL = "anthropic/claude-3.5-sonnet" # أقوى وأغلى
 
 TIMEZONE = ZoneInfo("Asia/Amman")
 PROFILE_FILE = "profile.json"
@@ -45,8 +49,7 @@ def get_current_context():
     }
 
 # ====================== تليجرام ======================
-def get_telegram_updates(offset=None, limit=20):
-    """جلب آخر التحديثات من تليجرام"""
+def get_telegram_updates(offset=None, limit=30):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
     params = {"limit": limit, "timeout": 0}
     if offset:
@@ -85,7 +88,6 @@ def send_telegram_message(text, reply_to=None):
         return None
 
 def extract_user_messages(updates, chat_id):
-    """استخراج رسائل المستخدم فقط من التحديثات"""
     messages = []
     for upd in updates:
         msg = upd.get("message") or upd.get("edited_message")
@@ -105,27 +107,34 @@ def extract_user_messages(updates, chat_id):
             })
     return messages
 
-# ====================== الذكاء (Gemini) ======================
-def call_gemini(prompt, model="gemini-2.0-flash"):
+# ====================== الذكاء عبر OpenRouter ======================
+def call_llm(prompt: str) -> str | None:
+    if not OPENROUTER_API_KEY:
+        print("OPENROUTER_API_KEY غير موجود")
+        return None
+
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(model=model, contents=prompt)
-        return response.text.strip()
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.75,
+            max_tokens=800,
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"خطأ Gemini: {e}")
+        print(f"خطأ OpenRouter: {e}")
         return None
 
 def process_conversation(profile, memory, context, user_messages):
-    """
-    يعالج رسائل المستخدم:
-    - يستخرج حقائق وملاحظات
-    - يولد رداً مناسباً
-    يرجع: (الرد, الذاكرة المحدثة)
-    """
     if not user_messages:
         return None, memory
 
-    # نأخذ آخر 5 رسائل كحد أقصى
     recent = user_messages[-5:]
     conversation_text = "\n".join([f"- {m['text']}" for m in recent])
 
@@ -159,7 +168,7 @@ def process_conversation(profile, memory, context, user_messages):
 3. حدد المواضيع الرئيسية في هذا الحوار.
 4. اكتب رداً طبيعياً وقصيراً (3-7 جمل) كصديق يتابع بصدق، مرتبط بما قاله، ويفتح باب الاستمرار إن ناسب.
 
-أرجع الرد بهذا الشكل بالضبط (JSON):
+أرجع الرد بهذا الشكل بالضبط (JSON فقط):
 
 {{
   "new_facts": ["حقيقة 1", "حقيقة 2"],
@@ -169,40 +178,32 @@ def process_conversation(profile, memory, context, user_messages):
 }}
 """
 
-    raw = call_gemini(prompt)
+    raw = call_llm(prompt)
     if not raw:
         return "وصلتني رسالتك، بس صار عندي مشكلة بسيطة. حاول مرة ثانية بعد شوي 😊", memory
 
-    # محاولة استخراج JSON
     try:
-        # تنظيف بسيط
         if "```json" in raw:
             raw = raw.split("```json")[1].split("```")[0].strip()
         elif "```" in raw:
             raw = raw.split("```")[1].split("```")[0].strip()
         data = json.loads(raw)
     except Exception:
-        # لو فشل JSON نعتبر كل النص رد
         return raw, memory
 
     # تحديث الذاكرة
-    new_facts = data.get("new_facts", [])
-    new_progress = data.get("progress_notes", [])
-    new_topics = data.get("topics", [])
-
-    for f in new_facts:
+    for f in data.get("new_facts", []):
         if f and f not in memory["known_facts"]:
             memory["known_facts"].append(f)
 
-    for p in new_progress:
+    for p in data.get("progress_notes", []):
         if p:
             memory["progress_notes"].append(p)
 
-    for t in new_topics:
+    for t in data.get("topics", []):
         if t and t not in memory["recent_topics"]:
             memory["recent_topics"].append(t)
 
-    # نحد من الطول
     memory["known_facts"] = memory["known_facts"][-25:]
     memory["progress_notes"] = memory["progress_notes"][-20:]
     memory["recent_topics"] = memory["recent_topics"][-15:]
@@ -212,7 +213,6 @@ def process_conversation(profile, memory, context, user_messages):
     return reply, memory
 
 def generate_proactive_message(profile, memory, context):
-    """رسالة استباقية ذكية عندما ما فيه حوار حديث"""
     known_facts = memory.get("known_facts", [])
     progress_notes = memory.get("progress_notes", [])
     recent_topics = memory.get("recent_topics", [])
@@ -255,7 +255,7 @@ def generate_proactive_message(profile, memory, context):
 
 الرسالة فقط:
 """
-    msg = call_gemini(prompt)
+    msg = call_llm(prompt)
     if not msg:
         fallbacks = [
             f"هلا {profile.get('name')}، كيف أمورك اليوم؟",
@@ -268,7 +268,7 @@ def generate_proactive_message(profile, memory, context):
 # ====================== التشغيل الرئيسي ======================
 if __name__ == "__main__":
     print("=" * 50)
-    print("بدء تشغيل الوكيل اليومي الكامل...")
+    print("بدء تشغيل الوكيل اليومي (OpenRouter)...")
     print("=" * 50)
 
     profile = load_json(PROFILE_FILE, {
@@ -285,7 +285,6 @@ if __name__ == "__main__":
         "conversation_style_preferences": []
     })
 
-    # تأكد من وجود الحقول
     for key in ["known_facts", "recent_topics", "progress_notes", "conversation_style_preferences"]:
         if key not in memory:
             memory[key] = []
@@ -294,38 +293,35 @@ if __name__ == "__main__":
 
     context = get_current_context()
     print(f"اليوم: {context['day_ar']} | الساعة: {context['time']}")
+    print(f"الموديل: {MODEL}")
 
     # 1. جلب الرسائل الجديدة
     offset = memory.get("last_update_id", 0) + 1 if memory.get("last_update_id") else None
     updates = get_telegram_updates(offset=offset)
     user_messages = extract_user_messages(updates, TELEGRAM_CHAT_ID)
 
-    print(f"عدد الرسائل الجديدة من المستخدم: {len(user_messages)}")
+    print(f"عدد الرسائل الجديدة: {len(user_messages)}")
 
     replied = False
 
     if user_messages:
-        # فيه حوار → نرد ونحدث الذاكرة
         print("يوجد رسائل جديدة → معالجة الحوار...")
         reply, memory = process_conversation(profile, memory, context, user_messages)
         if reply:
-            # نحدث last_update_id
             memory["last_update_id"] = max(m["update_id"] for m in user_messages)
             send_telegram_message(reply)
-            print("تم إرسال الرد على المستخدم.")
+            print("تم إرسال الرد.")
             replied = True
     else:
         print("لا توجد رسائل جديدة.")
 
-    # 2. لو ما ردينا (أو حتى لو ردينا)، نرسل رسالة استباقية أحياناً؟
-    # حالياً: نرسل استباقية فقط لو ما كان فيه حوار حديث
     if not replied:
         print("إرسال رسالة استباقية...")
         proactive = generate_proactive_message(profile, memory, context)
         send_telegram_message(proactive)
         print("تم إرسال الرسالة الاستباقية.")
 
-    # 3. حفظ الذاكرة
+    # حفظ الذاكرة
     memory["last_updated"] = f"{context['date']} {context['time']}"
     save_json(MEMORY_FILE, memory)
     print("تم حفظ memory.json")
