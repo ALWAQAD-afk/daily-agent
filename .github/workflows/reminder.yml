@@ -2,18 +2,17 @@ name: Random Daily Agent
 
 on:
   schedule:
-    # يعمل 4 مرات يومياً (بتوقيت UTC)
-    - cron: '0 4 * * *'   # ≈ 7 صباحاً بتوقيت الأردن
+    - cron: '0 4 * * *'   # ≈ 7 صباحاً
     - cron: '0 9 * * *'   # ≈ 12 ظهراً
     - cron: '0 14 * * *'  # ≈ 5 مساءً
     - cron: '0 19 * * *'  # ≈ 10 مساءً
-  workflow_dispatch:      # تشغيل يدوي للاختبار
+  workflow_dispatch:
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write   # مهم جداً عشان نحفظ الذاكرة
 
     steps:
       - name: Checkout code
@@ -27,10 +26,10 @@ jobs:
       - name: Install dependencies
         run: pip install google-genai requests
 
-      - name: 🎲 Random Delay (0 to 45 mins)
+      - name: 🎲 Random Delay (0-40 mins)
         run: |
-          DELAY=$(( RANDOM % 2700 ))
-          echo "Waiting for $DELAY seconds to surprise the user..."
+          DELAY=$(( RANDOM % 2400 ))
+          echo "Waiting for $DELAY seconds..."
           sleep $DELAY
 
       - name: 🚀 Run Agent
@@ -39,3 +38,16 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python bot.py
+
+      - name: 💾 Save memory if changed
+        run: |
+          git config user.name "daily-agent[bot]"
+          git config user.email "daily-agent[bot]@users.noreply.github.com"
+          git add memory.json
+          if git diff --staged --quiet; then
+            echo "No memory changes"
+          else
+            git commit -m "chore: update memory from agent run"
+            git push
+            echo "Memory committed"
+          fi
