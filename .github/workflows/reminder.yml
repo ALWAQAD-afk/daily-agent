@@ -2,17 +2,17 @@ name: Random Daily Agent
 
 on:
   schedule:
-    - cron: '0 4 * * *'   # ≈ 7 صباحاً
-    - cron: '0 9 * * *'   # ≈ 12 ظهراً
-    - cron: '0 14 * * *'  # ≈ 5 مساءً
-    - cron: '0 19 * * *'  # ≈ 10 مساءً
+    - cron: '0 4 * * *'
+    - cron: '0 9 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 19 * * *'
   workflow_dispatch:
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # مهم جداً عشان نحفظ الذاكرة
+      contents: write
 
     steps:
       - name: Checkout code
@@ -24,7 +24,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install google-genai requests
+        run: pip install openai requests
 
       - name: 🎲 Random Delay (0-40 mins)
         run: |
@@ -36,7 +36,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: python bot.py
 
       - name: 💾 Save memory if changed
