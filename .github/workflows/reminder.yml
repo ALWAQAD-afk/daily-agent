@@ -2,16 +2,19 @@ name: Random Daily Agent
 
 on:
   schedule:
-    # يعمل 4 مرات يومياً في أوقات مختلفة
-    - cron: '0 4 * * *'  # 7 صباحاً بتوقيتك
-    - cron: '0 9 * * *'  # 12 ظهراً
-    - cron: '0 14 * * *' # 5 مساءً
-    - cron: '0 19 * * *' # 10 مساءً
-  workflow_dispatch: # زر للتشغيل اليدوي للاختبار
+    # يعمل 4 مرات يومياً (بتوقيت UTC)
+    - cron: '0 4 * * *'   # ≈ 7 صباحاً بتوقيت الأردن
+    - cron: '0 9 * * *'   # ≈ 12 ظهراً
+    - cron: '0 14 * * *'  # ≈ 5 مساءً
+    - cron: '0 19 * * *'  # ≈ 10 مساءً
+  workflow_dispatch:      # تشغيل يدوي للاختبار
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,15 +22,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       - name: Install dependencies
         run: pip install google-genai requests
 
-      - name: 🎲 Random Delay (0 to 60 mins)
-        # الانتظار لوقت عشوائي حتى لا تكون الرسالة متوقعة
+      - name: 🎲 Random Delay (0 to 45 mins)
         run: |
-          DELAY=$(( RANDOM % 3600 ))
+          DELAY=$(( RANDOM % 2700 ))
           echo "Waiting for $DELAY seconds to surprise the user..."
           sleep $DELAY
 
