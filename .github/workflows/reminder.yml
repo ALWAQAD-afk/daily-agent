@@ -1,15 +1,19 @@
-name: Smart Reminder Agent
+name: Random Daily Agent
 
 on:
   schedule:
-    - cron: '0 6,12,18 * * *'
-  workflow_dispatch:
+    # يعمل 4 مرات يومياً في أوقات مختلفة
+    - cron: '0 4 * * *'  # 7 صباحاً بتوقيتك
+    - cron: '0 9 * * *'  # 12 ظهراً
+    - cron: '0 14 * * *' # 5 مساءً
+    - cron: '0 19 * * *' # 10 مساءً
+  workflow_dispatch: # زر للتشغيل اليدوي للاختبار
 
 jobs:
-  run-reminder:
+  run-agent:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -18,13 +22,18 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: |
-          pip install google-genai requests
+        run: pip install google-genai requests
 
-      - name: Run Bot Script
+      - name: 🎲 Random Delay (0 to 60 mins)
+        # الانتظار لوقت عشوائي حتى لا تكون الرسالة متوقعة
+        run: |
+          DELAY=$(( RANDOM % 3600 ))
+          echo "Waiting for $DELAY seconds to surprise the user..."
+          sleep $DELAY
+
+      - name: 🚀 Run Agent
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          python bot.py
+        run: python bot.py
