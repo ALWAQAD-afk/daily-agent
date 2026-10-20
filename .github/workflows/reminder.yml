@@ -2,10 +2,8 @@ name: Random Daily Agent
 
 on:
   schedule:
-    - cron: '0 4 * * *'
-    - cron: '0 9 * * *'
-    - cron: '0 14 * * *'
-    - cron: '0 19 * * *'
+    # كل 12 دقيقة تقريباً (يعطي تقريباً 3-7 مرات في الساعة مع العشوائية)
+    - cron: '*/12 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -15,39 +13,36 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install dependencies
         run: pip install openai requests
 
-      - name: 🎲 Random Delay (0-40 mins)
+      - name: Random small delay (0-8 minutes)
         run: |
-          DELAY=$(( RANDOM % 2400 ))
-          echo "Waiting for $DELAY seconds..."
+          DELAY=$(( RANDOM % 480 ))
+          echo "Waiting $DELAY seconds..."
           sleep $DELAY
 
-      - name: 🚀 Run Agent
+      - name: Run Agent
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: python bot.py
 
-      - name: 💾 Save memory if changed
+      - name: Commit memory if changed
         run: |
           git config user.name "daily-agent[bot]"
           git config user.email "daily-agent[bot]@users.noreply.github.com"
-          git add memory.json
+          git add memory.json profile.json 2>/dev/null || true
           if git diff --staged --quiet; then
-            echo "No memory changes"
+            echo "No changes"
           else
-            git commit -m "chore: update memory from agent run"
-            git push
-            echo "Memory committed"
+            git commit -m "chore: update memory" || true
+            git push || true
           fi
